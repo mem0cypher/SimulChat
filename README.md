@@ -4,6 +4,8 @@ SimulChat is an interactive desktop application that creates a lively, simulated
 
 A standout feature is the automatic "Dance Mode," where the AIs detect music from your screen's audio and erupt into a synchronized emote dance party. Built with React, Python/Flask, and powered by a local Ollama instance, SimulChat offers a dynamic and entertaining way to interact with AI.
 
+![SimulChat Screenshot](assets/simulchat-screenshot.png)
+
 ## Features
 
 - **Multiple AI Personalities**: Various chat personalities, each with distinct behaviors (see `agent_context.md` for full details).
