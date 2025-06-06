@@ -1,6 +1,8 @@
-# SimulChat - AI Twitch Chat Simulator (v1.0.0)
+# SimulChat: The AI-Powered Twitch Chat Simulator (v1.1.0)
 
-A web-based application that simulates a Twitch chat environment populated with AI-powered chatters. Each AI agent has a unique personality and responds to streamer input (text or voice) and visual context in a realistic Twitch-like manner.
+SimulChat is an interactive desktop application that creates a lively, simulated Twitch chat experience powered by a diverse cast of AI personalities. These AI agents react in real-time not only to your typed messages and voice commands, but also to visual content from your camera or screen share.
+
+A standout feature is the automatic "Dance Mode," where the AIs detect music from your screen's audio and erupt into a synchronized emote dance party. Built with React, Python/Flask, and powered by a local Ollama instance, SimulChat offers a dynamic and entertaining way to interact with AI.
 
 ## Features
 
@@ -14,6 +16,8 @@ A web-based application that simulates a Twitch chat environment populated with 
 - **Realistic Chat Simulation**: AI agents respond to specific streamer input and generate ambient chatter.
 - **Twitch-like UI**: Authentic Twitch chat styling with a modern, polished interface.
 - **Viewers Counter**: Displays a random number of viewers (50-500) when clicking the viewers button.
+- **Frame Capture**: The system automatically captures frames from active live feeds (camera/screen) periodically.
+- **Visual Status**: The UI header displays the current status of visual context (e.g., "Camera Active", "Screen Share Active", "Cam & Screen Active").
 
 ## Recent Improvements
 
@@ -163,6 +167,7 @@ Key agents include:
   - `/backend`: Python Flask backend.
     - `app.py`: Main Flask application with API endpoints.
     - `requirements.txt`: Python dependencies.
+    - `install_ffmpeg.ps1`: Helper script for installing ffmpeg on Windows.
   - `agent_context.md`: Detailed descriptions and system prompts for AI agents.
   - `package.json`: Frontend dependencies and scripts.
   - `README.md`: This file.
@@ -178,12 +183,12 @@ Key agents include:
 ### Modifying Visual Context Processing
 
 - **Frame Rate**: Adjust `setInterval` timing in `captureAndSendFrame` (for camera) and `captureAndSendScreenFrame` (for screen share) in `src/components/Chat.jsx`.
-- **Backend Context Handling**: The `/api/update-visual-context` endpoint in `backend/app.py` currently stores a single base64 image string. To enable true simultaneous processing of multiple visual feeds by the LLM, this backend endpoint and the subsequent calls to Ollama would need to be modified to handle multiple image inputs if your chosen Ollama model supports it.
+- **Backend Context Handling**: The `/api/update-visual-context` endpoint in `backend/app.py` currently stores the latest frame from any source. To enable true simultaneous processing, this backend endpoint and the subsequent calls to Ollama would need to be modified to handle multiple image inputs if your chosen LLM supports it.
 
 ### Speech-to-Text
 
-The current STT implementation uses the SpeechRecognition library with Google Web API. The browser's `MediaRecorder` captures audio, which is then sent to the `/api/transcribe-audio` endpoint in `backend/app.py`. This backend endpoint processes the audio and returns the transcribed text.
+The current STT implementation uses the SpeechRecognition library, which can leverage various engines (defaulting to Google Web API). The browser's `MediaRecorder` captures audio, which is then sent to the `/api/transcribe-audio` endpoint in `backend/app.py`. This backend endpoint processes the audio and returns the transcribed text.
 
 ## License
 
-MIT License. See LICENSE file (if one exists, otherwise assume MIT). 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
