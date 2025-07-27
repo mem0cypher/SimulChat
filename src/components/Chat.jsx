@@ -703,6 +703,8 @@ const Chat = () => {
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
   const [isRecording, setIsRecording] = useState(false);
+  // Ref mirrors isRecording for access inside stale closures (MediaRecorder handlers)
+  const isRecordingRef = useRef(false);
 
   const chatEndRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -1273,32 +1275,48 @@ const Chat = () => {
   }
 
   const stopVAD = () => {
+    console.log("=== VAD STOP ATTEMPT ===");
+    console.log("VAD: vadIntervalRef exists:", !!vadIntervalRef.current);
+    console.log("VAD: microphoneSourceRef exists:", !!microphoneSourceRef.current);
+    console.log("VAD: analyserRef exists:", !!analyserRef.current);
+    
     if (vadIntervalRef.current) {
       clearInterval(vadIntervalRef.current);
       vadIntervalRef.current = null;
+      console.log("VAD: Interval cleared");
     }
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
+      console.log("VAD: Silence timer cleared");
     }
     if (maxRecordingTimerRef.current) {
       clearTimeout(maxRecordingTimerRef.current);
       maxRecordingTimerRef.current = null;
+      console.log("VAD: Max recording timer cleared");
     }
     if (microphoneSourceRef.current) {
       microphoneSourceRef.current.disconnect();
       microphoneSourceRef.current = null;
+      console.log("VAD: Microphone source disconnected");
     }
     if (analyserRef.current) {
       analyserRef.current.disconnect();
+      analyserRef.current = null; // CRITICAL: Reset to null so new analyser can be created
+      console.log("VAD: Analyser disconnected and reset to null");
     }
     // Reset speech detection flag
     hasSpeechOccurredRef.current = false;
     setIsSpeaking(false);
-    console.log("VAD: Stopped and reset");
+    console.log("VAD: Stopped and reset - all resources cleaned up");
   };
 
   const startVAD = (stream) => {
+    console.log("=== VAD START ATTEMPT ===");
+    console.log("VAD: Stream provided:", !!stream);
+    console.log("VAD: Stream active:", stream?.active);
+    console.log("VAD: Audio tracks:", stream?.getAudioTracks().length);
+    
     if (!stream || !stream.active || stream.getAudioTracks().length === 0) {
       console.error("VAD: Invalid or inactive stream provided.");
       return;
@@ -1312,11 +1330,17 @@ const Chat = () => {
       // Reset speech detection flag
       hasSpeechOccurredRef.current = false;
       
-      // Create or resume AudioContext
-      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-        console.log("VAD: New AudioContext created, state:", audioContextRef.current.state);
+      // CRITICAL: Force creation of a new AudioContext to ensure clean state
+      // This is necessary because AudioContext state can become corrupted after multiple restarts
+      if (audioContextRef.current) {
+        console.log("VAD: Closing existing AudioContext");
+        audioContextRef.current.close().catch(err => console.warn("VAD: Error closing AudioContext:", err));
       }
+      
+      // Create a completely new AudioContext
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      console.log("VAD: New AudioContext created, state:", audioContextRef.current.state);
+      
       const audioContext = audioContextRef.current;
 
       // Ensure AudioContext is running
@@ -1329,28 +1353,36 @@ const Chat = () => {
             throw new Error("Could not resume audio context: " + err.message);
           });
       }
-
-      // Create analyzer with appropriate settings
-      if (!analyserRef.current) {
-        analyserRef.current = audioContext.createAnalyser();
-        analyserRef.current.fftSize = 2048; 
-        analyserRef.current.smoothingTimeConstant = 0.5; // ADJUSTED: Reduced from 0.8 for faster response
-        console.log("VAD: Analyser created with fftSize:", analyserRef.current.fftSize);
+      
+      // Create a completely new analyzer with appropriate settings
+      // CRITICAL: Always recreate the analyser to ensure clean state
+      if (analyserRef.current) {
+        console.log("VAD: Disconnecting existing analyser");
+        analyserRef.current.disconnect();
+        analyserRef.current = null;
       }
+      
+      analyserRef.current = audioContext.createAnalyser();
+      analyserRef.current.fftSize = 2048; 
+      analyserRef.current.smoothingTimeConstant = 0.5; // ADJUSTED: Reduced from 0.8 for faster response
+      console.log("VAD: New analyser created with fftSize:", analyserRef.current.fftSize);
+      
       const analyser = analyserRef.current;
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
 
-      // Create and connect microphone source
+      // Create a completely new microphone source connection
+      // CRITICAL: Always recreate the microphone source to ensure clean state
       if (microphoneSourceRef.current) { 
         console.log("VAD: Disconnecting previous microphone source");
         microphoneSourceRef.current.disconnect();
+        microphoneSourceRef.current = null;
       }
       
       try {
         microphoneSourceRef.current = audioContext.createMediaStreamSource(stream);
         microphoneSourceRef.current.connect(analyser);
-        console.log("VAD: Microphone source connected to analyser successfully");
+        console.log("VAD: New microphone source connected to analyser successfully");
       } catch (sourceError) {
         console.error("VAD: Failed to create or connect media stream source:", sourceError);
         throw new Error("Could not connect to microphone: " + sourceError.message);
@@ -1360,6 +1392,7 @@ const Chat = () => {
       if (vadIntervalRef.current) {
         console.log("VAD: Clearing previous interval");
         clearInterval(vadIntervalRef.current);
+        vadIntervalRef.current = null;
       }
 
       console.log(`VAD: Starting check interval (${VAD_CHECK_INTERVAL_MS}ms) with silence threshold ${VAD_SILENCE_THRESHOLD} and duration ${VAD_SILENCE_DURATION_MS}ms`);
@@ -1369,36 +1402,80 @@ const Chat = () => {
       const SILENCE_FRAME_THRESHOLD = Math.ceil(VAD_SILENCE_DURATION_MS / VAD_CHECK_INTERVAL_MS);
       console.log(`VAD: Will auto-stop after ${SILENCE_FRAME_THRESHOLD} consecutive silence frames`);
       
-      // Start the VAD interval
+      // Start the VAD interval - MODIFIED for continuous recording
+      console.log("VAD: Creating new interval with ID:", Date.now());
       vadIntervalRef.current = setInterval(() => {
+        // DEBUG: Log MediaRecorder state on each interval tick (first few times)
+        if (Math.random() < 0.1) { // 10% of checks
+          console.log("VAD Interval: MR State:", mediaRecorderRef.current?.state, "isRecording:", isRecording);
+        }
+        
         // CRITICAL ENTRY CHECK: If MediaRecorder is not recording, VAD has no job.
-        if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "recording") {
-            console.warn("VAD Interval: MediaRecorder is not 'recording' or null. Stopping VAD interval.", 
-                         `MR State: ${mediaRecorderRef.current?.state}`);
-            stopVAD(); // This will clear this interval.
-            return;    // Exit this tick of the interval.
+        // BUT: Allow a brief grace period for MediaRecorder to start after restart
+        if (!mediaRecorderRef.current) {
+            console.warn("VAD Interval: MediaRecorder is null. Stopping VAD interval.");
+            stopVAD();
+            return;
+        }
+        
+        // FIXED: Don't stop VAD immediately if MediaRecorder is starting up
+        if (mediaRecorderRef.current.state !== "recording") {
+            // Give MediaRecorder a chance to start (it might be in 'inactive' state briefly)
+            if (mediaRecorderRef.current.state === "inactive" && isRecording) {
+                console.log("VAD Interval: MediaRecorder inactive but isRecording=true, allowing grace period");
+                return; // Skip this check, don't stop VAD yet
+            } else {
+                console.warn("VAD Interval: MediaRecorder not recording and not in grace period. State:", 
+                           mediaRecorderRef.current.state, "isRecording:", isRecording);
+                stopVAD();
+                return;
+            }
         }
 
-        // Safety checks for analyser and stream (already present, good)
+        // Safety checks for analyser and stream
         if (!analyserRef.current || !microphoneSourceRef.current || !stream.active) {
             console.warn("VAD Interval: Analyser, source, or stream inactive/null. Stopping VAD.");
             stopVAD();
             return;
         }
         
-        // Get audio data
+        // Get audio data - CRITICAL: Recreate dataArray each time to ensure it's accessible
         try {
-          analyser.getByteFrequencyData(dataArray);
+          // DEBUG: Check if analyser is properly connected
+          if (!analyserRef.current) {
+            console.error("VAD Interval: analyserRef.current is null!");
+            stopVAD();
+            return;
+          }
+          
+          const currentBufferLength = analyserRef.current.frequencyBinCount;
+          const currentDataArray = new Uint8Array(currentBufferLength);
+          
+          // DEBUG: Log analyser state
+          if (Math.random() < 0.02) { // 2% of checks
+            console.log("VAD Debug: BufferLength:", currentBufferLength, "AnalyserConnected:", !!analyserRef.current, "MicSourceConnected:", !!microphoneSourceRef.current);
+          }
+          
+          analyserRef.current.getByteFrequencyData(currentDataArray);
           
           let sum = 0;
-          for (let i = 0; i < bufferLength; i++) { sum += dataArray[i]; }
-          const averageAmplitude = sum / bufferLength;
+          for (let i = 0; i < currentBufferLength; i++) { sum += currentDataArray[i]; }
+          const averageAmplitude = sum / currentBufferLength;
           
-          if (Math.random() < 0.05) { // ~5% of checks get logged
-            console.log(`VAD Check: Avg Amp: ${averageAmplitude.toFixed(2)}, Thr: ${VAD_SILENCE_THRESHOLD}, Spk: ${averageAmplitude > VAD_SILENCE_THRESHOLD}, Occ: ${hasSpeechOccurredRef.current}, SilFrames: ${silenceFrameCount}/${SILENCE_FRAME_THRESHOLD}, RecState: ${mediaRecorderRef.current?.state}`);
+          // DEBUG: Always log amplitude for first few seconds after restart to see if it's working
+          const now = Date.now();
+          if (!window.lastVADRestartTime) window.lastVADRestartTime = now;
+          const timeSinceRestart = now - window.lastVADRestartTime;
+          
+          if (timeSinceRestart < 5000 || Math.random() < 0.05) { // First 5 seconds or 5% of checks
+            console.log(`🔊 VAD Check: Amp: ${averageAmplitude.toFixed(2)}, Thr: ${VAD_SILENCE_THRESHOLD}, Speaking: ${averageAmplitude > VAD_SILENCE_THRESHOLD}, HasOccurred: ${hasSpeechOccurredRef.current}`);
           }
   
           if (averageAmplitude > VAD_SILENCE_THRESHOLD) {
+            // Check if this is the first speech detection after reset
+            if (!hasSpeechOccurredRef.current) {
+              console.log("🎤 VAD: FIRST SPEECH DETECTED after reset! Starting new detection cycle.");
+            }
             setIsSpeaking(true);
             hasSpeechOccurredRef.current = true;
             silenceFrameCount = 0;
@@ -1407,23 +1484,18 @@ const Chat = () => {
             if (hasSpeechOccurredRef.current) {
               silenceFrameCount++;
               if (silenceFrameCount >= SILENCE_FRAME_THRESHOLD) {
-                console.log(`VAD: ${silenceFrameCount} consec. silent frames. Calling mediaRecorder.stop().`);
+                console.log(`VAD: ${silenceFrameCount} consec. silent frames. Processing speech segment in continuous mode.`);
                 silenceFrameCount = 0;
 
+                // CONTINUOUS MODE: Stop and restart recording to create complete audio segments
                 if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-                  mediaRecorderRef.current.stop(); // DIRECTLY CALL STOP
-                  console.log("VAD: mediaRecorder.stop() called. onstop handler will manage cleanup & state.");
+                  console.log("VAD: Processing speech segment, stopping and restarting recording.");
+                  // Stop current recording to get a complete audio segment
+                  mediaRecorderRef.current.stop();
+                  hasSpeechOccurredRef.current = false; // Reset for next speech segment
                 } else {
-                  console.warn("VAD: Wanted to stop MediaRecorder, but it wasn't in 'recording' state or was null.",
-                               `MR State: ${mediaRecorderRef.current?.state}`);
-                  // If MR already stopped, but VAD is still running, ensure VAD cleans up.
-                  stopVAD();
-                  // Ensure React state is also false if desynced
-                  setIsRecording(currentIsRecording => currentIsRecording ? false : false);
+                  console.warn("VAD: MediaRecorder not in recording state:", mediaRecorderRef.current?.state);
                 }
-                // CRITICAL: Exit this interval's execution path immediately after initiating stop.
-                // The onstop handler will call stopVAD(), which clears the interval.
-                return; 
               }
             }
           }
@@ -1433,7 +1505,9 @@ const Chat = () => {
         }
       }, VAD_CHECK_INTERVAL_MS);
       
-      console.log("VAD: Setup completed successfully");
+      console.log("VAD: Interval created successfully with ID:", vadIntervalRef.current);
+      console.log("VAD: Setup completed successfully in continuous mode");
+      console.log("=== VAD START COMPLETE ===");
 
     } catch (error) {
       console.error("VAD: Error during setup:", error);
@@ -1442,26 +1516,158 @@ const Chat = () => {
     }
   };
 
+  // Create a function to setup MediaRecorder handlers - moved outside to be accessible by VAD restart logic
+  const setupMediaRecorderHandlers = () => {
+    mediaRecorderRef.current.ondataavailable = (event) => {
+      console.log("MediaRecorder data available, size:", event.data.size);
+      if (event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
+      }
+    };
+
+    mediaRecorderRef.current.onstop = async () => {
+      console.log("ONSTOP: Processing audio segment. Chunks:", audioChunksRef.current.length, "State:", mediaRecorderRef.current?.state);
+
+      let transcriptProcessed = false;
+      try {
+        // Process audio chunks from the completed segment
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current.mimeType });
+          console.log("ONSTOP: Processing audio segment, size:", audioBlob.size, "bytes, type:", audioBlob.type);
+          
+          // Clear chunks immediately after creating the blob
+          audioChunksRef.current = []; 
+          console.log("ONSTOP: Audio chunks cleared.");
+
+          if (audioBlob.size > 0) {
+            console.log("ONSTOP: Transcribing audio segment...");
+            const transcript = await getTranscriptionFromAudio(audioBlob);
+            if (transcript && transcript.trim() !== "") {
+              console.log("ONSTOP: Transcript success:", transcript);
+              await processStreamerInputAndTriggerAIs(transcript, true);
+              transcriptProcessed = true;
+            } else {
+              console.warn("ONSTOP: Transcription failed or empty transcript.");
+            }
+          }
+        } else {
+          console.log("ONSTOP: No audio chunks to process.");
+        }
+      } catch (error) {
+        console.error("ONSTOP: Error during audio processing:", error);
+        setBackendError(`Error processing audio: ${error.message}`);
+      }
+      
+      // DEBUG: Log current state for troubleshooting
+      console.log("ONSTOP: State check - isRecording:", isRecording, "streamActive:", streamRef.current?.active, "streamExists:", !!streamRef.current);
+      
+      // Check if this was a manual stop (user clicked mic button) vs automatic segment processing
+      if (!isRecordingRef.current) {
+        console.log("ONSTOP: Manual stop detected - cleaning up resources");
+        // Stop VAD and clear related timers
+        stopVAD();
+        
+        // Clean up media stream resources
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => {
+            console.log("ONSTOP: Stopping track:", track.label);
+            track.stop();
+          });
+          streamRef.current = null;
+          console.log("ONSTOP: Media stream cleared.");
+        }
+        
+        console.log("ONSTOP: Manual stop complete. Final transcript processed:", transcriptProcessed);
+      } else {
+        console.log("ONSTOP: Automatic segment processing - will restart recording");
+        
+        // CONTINUOUS MODE: Restart recording to keep listening for next speech segment
+        setTimeout(() => {
+          console.log("ONSTOP: Attempting restart - isRecording:", isRecording, "streamActive:", streamRef.current?.active);
+          
+          if (streamRef.current && streamRef.current.active) {
+            console.log("ONSTOP: Stream is active, restarting recording for continuous listening");
+            try {
+              // STEP 1: Stop any existing VAD to prevent conflicts
+              console.log("ONSTOP: Stopping existing VAD before restart");
+              stopVAD();
+              
+              // STEP 1.5: CRITICAL - Reset ALL VAD state to original "waiting for first speech" condition
+              console.log("ONSTOP: Resetting VAD state to original condition");
+              hasSpeechOccurredRef.current = false; // Reset to "waiting for first speech"
+              setIsSpeaking(false); // Reset speaking indicator
+              console.log("ONSTOP: VAD state reset - hasSpeechOccurred:", hasSpeechOccurredRef.current, "isSpeaking: false");
+              
+              // STEP 2: Create new MediaRecorder
+              const previousMimeType = mediaRecorderRef.current?.mimeType || 'audio/webm;codecs=opus';
+              const options = { 
+                mimeType: previousMimeType, 
+                audioBitsPerSecond: 128000 
+              };
+              
+              mediaRecorderRef.current = new MediaRecorder(streamRef.current, options);
+              console.log("ONSTOP: New MediaRecorder created with mimeType:", previousMimeType);
+              
+              // STEP 3: Setup handlers for the new recorder
+              setupMediaRecorderHandlers();
+              
+              // STEP 4: Start VAD BEFORE starting MediaRecorder (critical order!)
+              console.log("ONSTOP: Starting VAD before MediaRecorder");
+              window.lastVADRestartTime = Date.now(); // Mark restart time for debugging
+              
+              // CRITICAL: Always start VAD with fresh audio context and analyser
+              console.log("ONSTOP: Starting VAD with fresh audio context");
+              startVAD(streamRef.current);
+              
+              // STEP 5: Start MediaRecorder
+              mediaRecorderRef.current.start(100);
+              console.log("ONSTOP: Recording and VAD restarted successfully for continuous mode");
+              
+            } catch (error) {
+              console.error("ONSTOP: Error restarting recording:", error);
+              setBackendError(`Error restarting recording: ${error.message}`);
+            }
+          } else {
+            console.warn("ONSTOP: Cannot restart - stream inactive. isRecording:", isRecording, "streamExists:", !!streamRef.current, "streamActive:", streamRef.current?.active);
+          }
+        }, 300); // Increased delay to ensure clean restart
+        
+        console.log("ONSTOP: Transcript processed:", transcriptProcessed, "- Recording will restart in 200ms");
+      }
+    };
+
+    mediaRecorderRef.current.onerror = (event) => {
+      console.error("MediaRecorder error:", event.error);
+      setBackendError(`Mic recording error: ${event.error.name}. Check permissions.`);
+      stopVAD(); // Stop VAD on error
+      setIsRecording(false);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
+  };
+
   const toggleRecording = async () => {
     setBackendError(null);
     if (isRecording) {
-      // User is manually stopping the recording
+      // User is manually stopping the recording - set flag first
+      console.log("VAD_DEBUG: User manually stopping recording.");
+      setIsRecording(false); // Set this first so onstop handler knows it's manual
+      isRecordingRef.current = false;
+      
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-        console.log("VAD_DEBUG: Manually stopping MediaRecorder via toggleRecording.");
+        console.log("VAD_DEBUG: Stopping MediaRecorder.");
         mediaRecorderRef.current.stop(); // This will trigger the onstop handler
-                                       // The onstop handler will call stopVAD() and setIsRecording(false)
       } else {
-        // Fallback: If isRecording is true but recorder isn't in a recording state (should not happen often)
-        console.warn("VAD_DEBUG: toggleRecording found isRecording=true, but MediaRecorder not in 'recording' state. Forcing cleanup.");
-        stopVAD(); // Clean up VAD resources
-        if (streamRef.current) { // Clean up stream resources
+        // Fallback cleanup
+        console.warn("VAD_DEBUG: MediaRecorder not in recording state. Forcing cleanup.");
+        stopVAD();
+        if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => track.stop());
             streamRef.current = null;
         }
-        setIsRecording(false); // Force UI update
       }
-      // Note: We no longer call setIsRecording(false) directly here for the primary stop path.
-      // We rely on the mediaRecorder.onstop event to handle this, making manual and VAD stops more consistent.
     } else {
       // User is starting a new recording
       try {
@@ -1499,104 +1705,21 @@ const Chat = () => {
         
         audioChunksRef.current = [];
 
-        mediaRecorderRef.current.ondataavailable = (event) => {
-          console.log("MediaRecorder data available, size:", event.data.size);
-          if (event.data.size > 0) audioChunksRef.current.push(event.data);
-        };
-
-        mediaRecorderRef.current.onstop = async () => {
-          console.log("ONSTOP: Entered. Chunks:", audioChunksRef.current.length, "State:", mediaRecorderRef.current?.state);
-
-          // 1. Stop VAD and clear related timers immediately.
-          console.log("ONSTOP: Calling stopVAD()");
-          stopVAD();
-
-          let transcriptProcessed = false;
-          try {
-            if (audioChunksRef.current.length > 0) {
-              const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current.mimeType });
-              console.log("ONSTOP: Created audio blob, size:", audioBlob.size, "bytes, type:", audioBlob.type);
-              
-              // Clear chunks immediately after creating the blob
-              audioChunksRef.current = []; 
-              console.log("ONSTOP: Audio chunks cleared.");
-
-              if (audioBlob.size > 0) {
-                console.log("ONSTOP: Transcribing audio...");
-                const transcript = await getTranscriptionFromAudio(audioBlob);
-                if (transcript && transcript.trim() !== "") {
-                  console.log("ONSTOP: Transcript success:", transcript);
-                  await processStreamerInputAndTriggerAIs(transcript, true);
-                  transcriptProcessed = true;
-                } else {
-                  console.warn("ONSTOP: Transcription failed or empty transcript.");
-                  if (transcript === null) { // Explicitly null means STT error likely
-                    setBackendError("Speech-to-text failed or no response.");
-                  } else { // Empty string or whitespace
-                    setBackendError("Empty transcript received. Please speak clearly.");
-                  }
-                }
-              } else {
-                console.warn("ONSTOP: Audio blob size is zero after recording.");
-                setBackendError("Recording resulted in an empty audio file. Try speaking louder.");
-              }
-            } else {
-              console.warn("ONSTOP: No audio chunks recorded. This might happen if recording stopped too quickly or no speech.");
-              // Only set error if speech was genuinely expected but nothing captured.
-              // If hasSpeechOccurredRef was true (now reset by stopVAD), it implies speech was there.
-              // However, this path is also taken for manual stops before speech.
-              // Let's be conservative with error messages here unless VAD specifically indicated speech.
-              // setBackendError("No audio data captured. Check microphone.");
-            }
-          } catch (error) {
-            console.error("ONSTOP: Error during audio processing/transcription:", error);
-            setBackendError(`Error processing audio: ${error.message}`);
-          } finally {
-            console.log("ONSTOP: Entering finally block.");
-            // 2. Clean up media stream resources.
-            if (streamRef.current) {
-              streamRef.current.getTracks().forEach(track => {
-                console.log("ONSTOP: Stopping track:", track.label);
-                track.stop();
-              });
-              streamRef.current = null;
-              console.log("ONSTOP: Media stream cleared.");
-            }
-
-            // 3. Update React state to reflect that recording has stopped.
-            console.log("ONSTOP: Setting isRecording to false.");
-            setIsRecording(false); 
-            console.log("ONSTOP: Exited. Transcript processed:", transcriptProcessed);
-          }
-        };
-
-        mediaRecorderRef.current.onerror = (event) => {
-          console.error("MediaRecorder error:", event.error);
-          setBackendError(`Mic recording error: ${event.error.name}. Check permissions.`);
-          stopVAD(); // Stop VAD on error
-          setIsRecording(false);
-          if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-            streamRef.current = null;
-          }
-        };
+        // Setup MediaRecorder handlers using the external function
+        setupMediaRecorderHandlers();
 
         // Set recording state before starting MediaRecorder
         setIsRecording(true);
+        isRecordingRef.current = true;
         
         // Start VAD before MediaRecorder to ensure it's ready
         startVAD(streamRef.current);
         
-        // Set a maximum recording time safety
-        maxRecordingTimerRef.current = setTimeout(() => {
-          console.log(`VAD: Maximum recording time of ${MAX_RECORDING_TIME_MS}ms reached, stopping automatically`);
-          if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-            mediaRecorderRef.current.stop();
-          }
-        }, MAX_RECORDING_TIME_MS);
+        // CONTINUOUS MODE: No maximum recording timer - mic stays on until manually stopped
+        console.log("Starting continuous recording mode - mic will stay on until manually turned off");
         
         // Start MediaRecorder with small timeslice for frequent data capture
-        console.log("Starting MediaRecorder with 100ms timeslice");
+        console.log("Starting MediaRecorder with 100ms timeslice in continuous mode");
         mediaRecorderRef.current.start(100);
         console.log("MediaRecorder started successfully, state:", mediaRecorderRef.current.state);
 

@@ -64,7 +64,9 @@ export const EmoteManager = ({ children }) => {
         emoteMap.set('POGGERS', 'https://cdn.7tv.app/emote/01F6P0803G000898NRWSAKGYXT/1x.avif');
         emoteMap.set('AlienPls', 'https://cdn.7tv.app/emote/01FA5X897G0007FCCDBQ9R010G/1x.avif');
         emoteMap.set('PogU', 'https://cdn.7tv.app/emote/01F6M3N17G000B5V5G2M2RYJN7/1x.avif');
-        console.log('Manually added classic, Madge, 5Head, monkaHmm, FeelsGoodMan, VIBE, monkaW, FeelsBadMan, monkaS, LULW, BASED, POGGERS, BANGER, and AlienPls emotes.');
+        emoteMap.set('HYPERS', 'https://cdn.7tv.app/emote/01F6NMD520000AAS5FM9QEF9ZJ/3x.avif');
+        emoteMap.set('KEKW', 'https://cdn.7tv.app/emote/01FCP0YPQ800037YGEKHNTNXY1/3x.avif');
+        console.log('Manually added classic, Madge, 5Head, monkaHmm, FeelsGoodMan, VIBE, monkaW, FeelsBadMan, monkaS, LULW, BASED, POGGERS, BANGER, AlienPls, HYPERS, and KEKW emotes.');
 
         // Remove the specific "hi" emote if it exists
         if (emoteMap.has('hi')) {
