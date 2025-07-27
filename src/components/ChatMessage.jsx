@@ -34,29 +34,31 @@ const ChatMessage = ({ message }) => {
         );
       }
       
-      // Check if this word contains an emote with punctuation
+      // Check if this word contains an emote with ONLY punctuation (not letters)
       for (const emoteName of emoteNames) {
         if (word.includes(emoteName) && word !== emoteName) {
-          // Word contains an emote plus other characters
+          // Check if the characters before/after the emote are only punctuation
           const beforeEmote = word.substring(0, word.indexOf(emoteName));
           const afterEmote = word.substring(word.indexOf(emoteName) + emoteName.length);
           
-          // Only include non-punctuation characters
-          const cleanBefore = beforeEmote.replace(/[!.,?:;]/g, '');
-          const cleanAfter = afterEmote.replace(/[!.,?:;]/g, '');
+          // Only process if before/after contains ONLY punctuation (no letters/numbers)
+          const beforeIsPunctuation = /^[!.,?:;]*$/.test(beforeEmote);
+          const afterIsPunctuation = /^[!.,?:;]*$/.test(afterEmote);
           
-          return (
-            <React.Fragment key={index}>
-              {cleanBefore && ` ${cleanBefore} `}
-              <img
-                src={emotes.get(emoteName)}
-                alt={emoteName}
-                className="inline-block h-7 w-auto mx-0.5 my-[-4px]"
-                title={emoteName}
-              />
-              {cleanAfter && ` ${cleanAfter} `}
-            </React.Fragment>
-          );
+          if (beforeIsPunctuation && afterIsPunctuation) {
+            return (
+              <React.Fragment key={index}>
+                {beforeEmote && beforeEmote}
+                <img
+                  src={emotes.get(emoteName)}
+                  alt={emoteName}
+                  className="inline-block h-7 w-auto mx-0.5 my-[-4px]"
+                  title={emoteName}
+                />
+                {afterEmote && afterEmote}
+              </React.Fragment>
+            );
+          }
         }
       }
       

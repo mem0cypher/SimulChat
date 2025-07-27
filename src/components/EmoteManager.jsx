@@ -60,6 +60,7 @@ export const EmoteManager = ({ children }) => {
         emoteMap.set('monkaS', 'https://cdn.7tv.app/emote/01F78CHJ2G0005TDSTZFBDGMK4/1x.avif');
         emoteMap.set('LULW', 'https://cdn.7tv.app/emote/01F22WE74G000F9Q0G00A2DE8N/1x.avif');
         emoteMap.set('BASED', 'https://cdn.7tv.app/emote/01F031CCA80001TJB3006SVBHS/1x.avif');
+        emoteMap.set('Based', 'https://cdn.7tv.app/emote/01FJRZF31R0005ZW4QCZF2M8JN/3x.avif');
         emoteMap.set('POGGERS', 'https://cdn.7tv.app/emote/01F6P0803G000898NRWSAKGYXT/1x.avif');
         emoteMap.set('AlienPls', 'https://cdn.7tv.app/emote/01FA5X897G0007FCCDBQ9R010G/1x.avif');
         emoteMap.set('PogU', 'https://cdn.7tv.app/emote/01F6M3N17G000B5V5G2M2RYJN7/1x.avif');

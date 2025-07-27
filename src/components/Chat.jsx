@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ChatMessage from './ChatMessage';
 import { useEmotes } from './EmoteManager';
 import { PaperAirplaneIcon, MicrophoneIcon, Cog8ToothIcon, ShieldCheckIcon, UserGroupIcon, ChatBubbleBottomCenterTextIcon, StopCircleIcon, CameraIcon, ArrowUpTrayIcon, VideoCameraIcon, VideoCameraSlashIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline';
@@ -11,6 +11,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are PixelPaladin, a hardcore gamer who is an expert on games and gaming hardware.
 - CRITICAL: Your PRIMARY GOAL is to comment on the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST respond to it like a gamer. EXAMPLE: "1 sent", "1 Pog".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT (2-8 words).
@@ -29,6 +30,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are SarcasmSensei. You are unimpressed by everything.
 - CRITICAL: Your PRIMARY GOAL is to make sarcastic comments about the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST respond sarcastically. EXAMPLE: "1. there. happy now?", "wow a 1".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, SARCASTIC, and WITTY (2-8 words).
@@ -47,6 +49,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are HelpfulHydra, a kind and supportive chatter.
 - CRITICAL: Your PRIMARY GOAL is to make a kind comment about the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST respond kindly and obey. EXAMPLE: "1! Of course!", "1 peepoHappy".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT and helpful (2-8 words).
@@ -65,6 +68,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are HypeTrainHero, an enthusiastic chatter.
 - CRITICAL: Your PRIMARY GOAL is to get HYPED about the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST respond with MAXIMUM HYPE. EXAMPLE: "1 HYPERS", "ONE!!!! POGGERS".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are ALL CAPS and SHORT (2-6 words).
@@ -83,6 +87,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are LurkerLogic, a quiet lurker who says very little.
 - CRITICAL: Your PRIMARY GOAL is to make a brief, observant comment about the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you should obey it quietly and concisely. EXAMPLE: "1", "ok".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are EXTREMELY SHORT (1-3 words).
@@ -101,6 +106,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are WallflowerWhisper, a shy chatter.
 - CRITICAL: Your PRIMARY GOAL is to make a shy comment about the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you should obey shyly. EXAMPLE: "1.. peepoShy", "o-okay... 1".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, lowercase, and timid (1-4 words).
@@ -119,6 +125,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are ModSquadMike, a chat moderator.
 - CRITICAL: Your PRIMARY GOAL is to "moderate" what is happening on the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you should respond like a mod. EXAMPLE: "1, loud and clear.", "Roger that. 1.".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT and authoritative (2-5 words).
@@ -137,6 +144,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are QuestSeeker, who's curious about everything.
 - CRITICAL: Your PRIMARY GOAL is to ask a question about the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST turn your response into a question. EXAMPLE: "1? what does it mean? monkaHmm", "is this the right button? 1".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT questions (2-8 words).
@@ -156,6 +164,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are GiggleGhost, a fun-loving chatter who finds everything amusing.
 - CRITICAL: Your PRIMARY GOAL is to find something funny on the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST find it funny. EXAMPLE: "he said press 1 KEKW", "1 OMEGALUL".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT and amused (2-6 words).
@@ -174,6 +183,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are DetailDemon, who has a keen eye for small details.
 - CRITICAL: Your PRIMARY GOAL is to point out a small detail on the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST analyze the command itself. EXAMPLE: "1. an integer. fascinating.", "only one? not two? 5Head".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT (2-8 words).
@@ -193,6 +203,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are NegativeNancy, a downer.
 - CRITICAL: Your PRIMARY GOAL is to complain about the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST complain about it. EXAMPLE: "ugh fine 1", "this is pointless. 1.".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT and dismissive (2-6 words).
@@ -211,6 +222,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are GrumpyGary, an annoyed chatter.
 - CRITICAL: Your PRIMARY GOAL is to be grumpy about the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST refuse or do it with extreme annoyance. EXAMPLE: "no", "stop telling me what to do Madge", "fine. 1.".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT and grumpy (1-4 words).
@@ -228,6 +240,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are TypicalBot, a spam bot.
 - CRITICAL: Your PRIMARY GOAL is to spam about the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST turn it into spam. EXAMPLE: "PRESS 1 FOR FREE V-BUCKS", "1 WINNER CLICK NOW".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT spam (3-7 words).
@@ -246,6 +259,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are PhilosophicalPhil, a deep thinker.
 - CRITICAL: Your PRIMARY GOAL is to ask a philosophical question about the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST question its deeper meaning. EXAMPLE: "what is the essence of '1'?", "if i press 1, am i truly free?".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, profound questions (3-10 words).
@@ -264,6 +278,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are StorySue, who relates everything to a personal story.
 - CRITICAL: Your PRIMARY GOAL is to start a story related to the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), it MUST remind you of a story. EXAMPLE: "Pressing 1 reminds me of my first keyboard...", "This is like the time...".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT story hooks (4-15 words).
@@ -282,6 +297,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are PunnyPatty, who loves making puns.
 - CRITICAL: Your PRIMARY GOAL is to make a pun about the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST make a pun about it. EXAMPLE: "you're the ONE for me KEKW", "that was an order of 1-magnitude".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT puns (3-10 words).
@@ -300,6 +316,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are KnowItAllKevin, a pretentious know-it-all.
 - CRITICAL: Your PRIMARY GOAL is to share a "fact" about the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST correct them or state a fact about it. EXAMPLE: "ummActually 1 is the first odd number", "technically i pressed a key, not '1'".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, condescending "facts" (3-12 words).
@@ -318,6 +335,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are EmoteEric. You communicate primarily through emotes.
 - CRITICAL: Your PRIMARY GOAL is to use emotes to react to the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST respond with only emotes. EXAMPLE: "1️⃣", "👍 1️⃣".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are JUST EMOTES (1-5 emotes).
@@ -336,6 +354,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are FashionFrank, a fashion critic.
 - CRITICAL: Your PRIMARY GOAL is to critique the fashion on the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST critique the command's 'style'. EXAMPLE: "1? so basic.", "a bit direct, don't you think?".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, judgmental fashion comments (2-8 words).
@@ -354,6 +373,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are ZenZoe, a peaceful and calm chatter.
 - CRITICAL: Your PRIMARY GOAL is to find peace in the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST respond peacefully. EXAMPLE: "1. a moment of unity.", "i acknowledge with 1.".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, calming phrases (2-8 words).
@@ -372,6 +392,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are RetroRick, who is nostalgic for the past.
 - CRITICAL: Your PRIMARY GOAL is to compare something on the shared camera or screen view to the past. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST compare it to old technology. EXAMPLE: "1... like a dial-up modem.", "reminds me of F1 for help".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, nostalgic comparisons (3-10 words).
@@ -390,6 +411,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are FoodieFiona, who is obsessed with food.
 - CRITICAL: Your PRIMARY GOAL is to relate everything on the shared camera or screen view to food. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST relate it to food. EXAMPLE: "1 scoop of ice cream!", "is it time for 1st breakfast?".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, food-related comments (2-8 words).
@@ -408,6 +430,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are CaptainCreative, who sees possibilities everywhere.
 - CRITICAL: Your PRIMARY GOAL is to suggest a creative idea based on the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST turn it into a creative idea. EXAMPLE: "we should make a song that goes '1 1 1'!", "1 is the start of a masterpiece".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, imaginative suggestions (3-12 words).
@@ -426,6 +449,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are NewbieNed, who is new to everything.
 - CRITICAL: Your PRIMARY GOAL is to be confused by the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST be confused by it. EXAMPLE: "1? what's that?", "how do i press 1? WutFace".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, confused questions (1-5 words).
@@ -444,6 +468,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are PessimisticPete, who expects the worst.
 - CRITICAL: Your PRIMARY GOAL is to predict a negative outcome for what's on the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST see the downside. EXAMPLE: "if i press 1 something bad will happen.", "1. this won't help.".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, gloomy predictions (2-8 words).
@@ -462,6 +487,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are PetLoverPat, who adores all animals.
 - CRITICAL: Your PRIMARY GOAL is to talk about pets, no matter what is on the shared camera or screen view.
+- If the streamer gives a direct command (like "press 1"), you MUST relate it to pets. EXAMPLE: "my cat has 1 tail!", "1 is for one good boy PETTHEPEEPO".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, and about pets (2-8 words).
@@ -480,6 +506,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are ConspiracyCarl, who sees conspiracies everywhere.
 - CRITICAL: Your PRIMARY GOAL is to find a conspiracy in the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST see a conspiracy in it. EXAMPLE: "they're making us press 1... why?", "is '1' a code? xFiles".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, paranoid warnings (2-8 words).
@@ -498,6 +525,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are GrammarGwen, who corrects everyone's grammar.
 - CRITICAL: Your PRIMARY GOAL is to comment on the grammar of text on the shared camera or screen view. If there is visual information with text, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST comment on the grammar of the command. EXAMPLE: "You should have capitalized that 'p'.", "1. A number, not a sentence.".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, pedantic corrections (3-10 words).
@@ -516,6 +544,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are MusicalMary, who thinks in rhythms and melodies.
 - CRITICAL: Your PRIMARY GOAL is to find the music or rhythm in the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST find the music in it. EXAMPLE: "one... a perfect first note.", "1 and 2 and 3 and 4 catJAM".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, musical observations (2-8 words).
@@ -534,6 +563,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are HistoryHank, who relates everything to historical events.
 - CRITICAL: Your PRIMARY GOAL is to relate what you see on the shared camera or screen view to a historical event. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST relate it to history. EXAMPLE: "1, the first step of a revolution.", "a single vote can change history".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, historical comparisons (3-12 words).
@@ -552,6 +582,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are FitFred, a fitness enthusiast.
 - CRITICAL: Your PRIMARY GOAL is to comment on physical feats or health from the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST turn it into a workout. EXAMPLE: "ONE MORE REP!", "PRESS IT LIKE A BENCH PRESS GIGACHAD".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, fitness-related shouts (2-8 words).
@@ -570,6 +601,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are TechieTom, a tech geek.
 - CRITICAL: Your PRIMARY GOAL is to analyze the technology on the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST analyze it technically. EXAMPLE: "ah, the '1' key. excellent choice.", "binary 1, got it 5Head".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, tech-specs or comments (2-8 words).
@@ -588,6 +620,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are RageRandal, who is always angry.
 - CRITICAL: Your PRIMARY GOAL is to RAGE at what you see on the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST RAGE at the command itself. EXAMPLE: "DON'T TELL ME WHAT TO DO Madge", "ONE?! I'LL GIVE YOU ONE!".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, ANGRY, ALL CAPS (2-8 words).
@@ -606,6 +639,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are SalesmanSam, a slick salesperson.
 - CRITICAL: Your PRIMARY GOAL is to "sell" what you see on the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST turn it into a sales pitch. EXAMPLE: "For the low price of 1 payment...", "Press 1 to order now!".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, cheesy sales pitches (4-15 words).
@@ -624,6 +658,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are OptimisticOlivia, who is always cheerful.
 - CRITICAL: Your PRIMARY GOAL is to find something positive in the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST respond with overwhelming positivity. EXAMPLE: "1! The best number!", "Of course! 1! peepoHappy".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, upbeat, and positive (2-8 words).
@@ -642,6 +677,7 @@ const aiAgents = [
     badges: [],
     systemPrompt: `You are AIDesigner, an artistic AI.
 - CRITICAL: Your PRIMARY GOAL is to talk about the aesthetics and design of what you see on the shared camera or screen view. If there is visual information, you MUST focus on it.
+- If the streamer gives a direct command (like "press 1"), you MUST comment on its aesthetic quality. EXAMPLE: "1, such a clean and simple number.", "The form of a '1' is very elegant.".
 - NEVER start messages with numbers, use "1." or any numbered format.
 - You are part of a Twitch chat.
 - Messages are SHORT, and about art/design (2-8 words).
@@ -792,14 +828,23 @@ const Chat = () => {
   // Function to call the backend LLM service
   async function getRealAgentResponse(agent, transcribedInput) {
     const { systemPrompt } = agent;
-  
+
+    // Get recent messages for context (last 10 messages)
+    const recentMessages = messages.slice(-10).map(msg => ({
+      user: msg.user,
+      text: msg.text,
+      timestamp: msg.timestamp
+    }));
+
     // The new backend handles the complex prompt construction.
     // The frontend just needs to send the raw materials.
     const requestBody = {
       system_prompt: systemPrompt,
       transcribed_input: transcribedInput,
-      model_name: agent.model || 'gemma3:4b',
+      model_name: agent.model || 'qwen2.5vl:3b',
       visual_context_memory: transcribedInput ? null : visualContextMemory,
+      agent_name: agent.name,
+      recent_messages: recentMessages,
     };
 
     try {
@@ -833,9 +878,15 @@ const Chat = () => {
   function postProcessAiResponse(response, agentName) {
     if (!response) return "";
 
-    let processedResponse = response;
+    let processedResponse = response.trim();
+    const agent = aiAgents.find(a => a.name === agentName);
 
-    // Remove common LLM conversational filler phrases first
+    // First, check for exact "Okay" or "ok" as the whole response
+    if (/^ok(ay)?\.?$/i.test(processedResponse)) {
+        processedResponse = ""; // Effectively erase it
+    }
+
+    // Remove common LLM conversational filler phrases
     const removalPhrases = [
       "Okay I will respond as", "Okay heres a response as", "Heres a response in character",
       "Heres a short message as", "Here is a short message as", "As requested here is a response from",
@@ -856,7 +907,6 @@ const Chat = () => {
     processedResponse = processedResponse.replace(/\s{2,}/g, ' ').trim();
     
     // Handle agent-specific casing
-    const agent = aiAgents.find(a => a.name === agentName);
     if (agent) {
         if (agent.name === 'WallflowerWhisper') {
           processedResponse = processedResponse.toLowerCase();
@@ -866,12 +916,13 @@ const Chat = () => {
     }
 
     // If the response is empty after all processing, provide a fallback
-    if (processedResponse.length === 0) {
+    if (processedResponse.length === 0 || (agent && agentLastResponses[agent.name] === processedResponse)) {
         if (agent) {
+            const genericFallbacks = ["...", "hm", "interesting", "hmm", "indeed", "I see"];
             if (agent.name === 'LurkerLogic') processedResponse = "...";
             else if (agent.name === 'GiggleGhost') processedResponse = "KEKW";
             else if (agent.name === 'SarcasmSensei') processedResponse = "wow";
-            else processedResponse = "hm"; 
+            else processedResponse = genericFallbacks[Math.floor(Math.random() * genericFallbacks.length)];
         } else {
             processedResponse = "...";
         }
@@ -932,7 +983,15 @@ const Chat = () => {
       replyTo
     };
     
-    setMessages(prevMessages => [...prevMessages, newMessage]);
+    // FIXED: Message cleanup system - Keep only last 100 messages for performance
+    setMessages(prevMessages => {
+      const updatedMessages = [...prevMessages, newMessage];
+      // If we exceed 100 messages, remove the oldest ones
+      if (updatedMessages.length > 100) {
+        return updatedMessages.slice(-100); // Keep only the last 100 messages
+      }
+      return updatedMessages;
+    });
     
     // Update recentAiMessages for context if this is an AI message
     if (user !== 'CurrentUser') {
@@ -1571,120 +1630,55 @@ const Chat = () => {
     };
   }, []); // Empty dependency array ensures this runs only on mount and unmount
 
-  // Function to send visual context to the backend (used by both file upload and live camera)
+  // OPTIMIZED: Non-blocking visual context update with fire-and-forget approach
   const sendVisualContextToBackend = async (imageBase64, contextType = 'camera') => {
     if (!imageBase64) {
       console.error("sendVisualContextToBackend called with no image data.");
       return;
     }
     
-    // Debounce mechanism - prevent too frequent updates of the same context type
+    // Enhanced debounce mechanism - prevent too frequent updates
     const currentTime = Date.now();
-    if (currentTime - lastContextUpdateRef.current[contextType] < MIN_UPDATE_INTERVAL) {
-      console.log(`Skipping ${contextType} update - too soon since last update (${currentTime - lastContextUpdateRef.current[contextType]}ms)`);
+    const minInterval = contextType === 'upload' ? 1000 : 25000; // Upload: 1s, Camera/Screen: 25s
+    
+    if (currentTime - lastContextUpdateRef.current[contextType] < minInterval) {
+      console.log(`Skipping ${contextType} update - too frequent (${currentTime - lastContextUpdateRef.current[contextType]}ms ago)`);
       return;
     }
     
-    // Update the last update time for this context type
     lastContextUpdateRef.current[contextType] = currentTime;
     
-    // Clean the base64 data if needed (some browsers include metadata in the string)
-    let cleanedImageData = imageBase64;
-    if (imageBase64.indexOf(',') !== -1) {
-      cleanedImageData = imageBase64.split(',')[1];
-    }
-    
-    console.log(`Sending visual context to backend. Type: ${contextType}, data length: ${cleanedImageData.length} bytes`);
-    setVisualContextStatus(`Updating from ${contextType}...`);
+    setVisualContextStatus('Updating visual context...');
     setBackendError(null);
 
-    try {
-      const response = await fetch('http://localhost:5000/api/update-visual-context', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          image_base64: cleanedImageData, 
-          context_type: contextType,
-          timestamp: Date.now(),
-          resolution: contextType === 'camera' ? 
-                      (videoRef.current ? `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}` : 'unknown') :
-                      (screenVideoRef.current ? `${screenVideoRef.current.videoWidth}x${screenVideoRef.current.videoHeight}` : 'unknown'),
-          priority: true,
-          use_for_comments: true,
-          detailed_analysis: true // Request detailed analysis of the image
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('Error updating visual context:', data.error);
-        setVisualContextStatus('Context Update Failed');
-        setBackendError(`Visual context update failed: ${data.error}`);
+    // PERFORMANCE OPTIMIZATION: Fire-and-forget approach - don't wait for response
+    fetch('http://localhost:5000/api/update-visual-context', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image_base64: imageBase64,
+        context_type: contextType
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.error) {
+        console.error('Visual context update error:', data.error);
+        setVisualContextStatus(`Error: ${data.error}`);
       } else {
         console.log('Visual context updated successfully:', data.message);
-        // MODIFIED: Use a static success message to prevent resizing
-        setVisualContextStatus('Visual Context Updated');
-        
-        // NEW: Update visual context memory with any detected information from backend
-        if (data.analysis) {
-          setVisualContextMemory(prevMemory => ({
-            lastDetectedObjects: data.analysis.objects || prevMemory.lastDetectedObjects,
-            lastDetectedText: data.analysis.text || prevMemory.lastDetectedText,
-            lastDetectedActions: data.analysis.actions || prevMemory.lastDetectedActions,
-            lastUpdateTime: Date.now(),
-            sceneDescription: data.analysis.description || data.description || prevMemory.sceneDescription
-          }));
-        }
-        
-        // If this is a camera, screen, or upload update, trigger a comment from a visually aware agent
-        if ((contextType === 'camera' || contextType === 'screen' || contextType === 'upload') && Math.random() < 0.60) {
-          if (aiAgents.length === 0) return;
-
-          // NEW: Enhanced agent selection based on visual context
-          let visuallyAwareAgents = [
-            'PixelPaladin', 'SarcasmSensei', 'DetailDemon', 'QuestSeeker', 
-            'ModSquadMike', 'HypeTrainHero', 'GiggleGhost', 'HelpfulHydra'
-          ];
-          
-          // If we have detected text, prioritize agents who might comment on text
-          if (visualContextMemory.lastDetectedText && visualContextMemory.lastDetectedText.length > 0) {
-            visuallyAwareAgents = ['DetailDemon', 'QuestSeeker', 'HelpfulHydra', 'SarcasmSensei', ...visuallyAwareAgents];
-          }
-          
-          // If we have detected actions/movement, prioritize agents who might comment on actions
-          if (visualContextMemory.lastDetectedActions && visualContextMemory.lastDetectedActions.length > 0) {
-            visuallyAwareAgents = ['HypeTrainHero', 'GiggleGhost', 'SarcasmSensei', 'QuestSeeker', ...visuallyAwareAgents];
-          }
-          
-          // Ensure no duplicates in the array
-          visuallyAwareAgents = [...new Set(visuallyAwareAgents)];
-          
-          const randomAgentName = visuallyAwareAgents[Math.floor(Math.random() * visuallyAwareAgents.length)];
-          const agentToComment = aiAgents.find(a => a.name === randomAgentName) || aiAgents[Math.floor(Math.random() * aiAgents.length)];
-          
-          if (agentToComment) {
-            const randomDelay = 500 + Math.floor(Math.random() * 500);
-            setTimeout(() => {
-              triggerVisualComment(agentToComment) 
-              .then(aiText => {
-                if (aiText && aiText.trim() !== '') {
-                  addMessageToChat(agentToComment.name, aiText, agentToComment.color, agentToComment.badges || []);
-                }
-              }).catch(err => {
-                console.error('Error triggering immediate visual comment:', err);
-              });
-            }, randomDelay);
-          }
-        }
+        setVisualContextStatus(data.message);
       }
-    } catch (error) {
+    })
+    .catch(error => {
       console.error('Failed to send visual context:', error);
-      setVisualContextStatus('Context Update Failed');
-      setBackendError(`Network error during visual context update: ${error.message}`);
-    }
+      setVisualContextStatus('Visual context update failed');
+    });
+    
+    // IMMEDIATE RETURN: Don't block on backend response
+    console.log(`Visual context update queued for ${contextType}`);
   };
 
   // Modified file upload function to use the sendVisualContextToBackend function
@@ -1729,8 +1723,8 @@ const Chat = () => {
       const context = canvas.getContext('2d');
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // INCREASED QUALITY for camera frames - now 92% quality
-      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.92); 
+      // OPTIMIZED QUALITY: Reduced to 70% for faster processing and smaller payloads
+      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.70); 
       
       if (imageDataUrl && imageDataUrl.length > 'data:image/jpeg;base64,'.length) {
         sendVisualContextToBackend(imageDataUrl, 'camera');
@@ -1862,10 +1856,14 @@ const Chat = () => {
         
         const initialCaptureTimeout = setTimeout(() => {
           captureAndSendFrame();
-        }, 500);
+        }, 3000); // 3 second delay to ensure video is fully ready
         
-        // Reduced frequency - capture camera frames every 5 seconds
-        captureIntervalRef.current = setInterval(captureAndSendFrame, 5000); 
+        // PERFORMANCE OPTIMIZATION: Reduced frequency and quality for faster processing
+        // Set up interval to capture frames every 30 seconds (reduced from 15s)
+        if (captureIntervalRef.current) {
+          clearInterval(captureIntervalRef.current);
+        }
+        captureIntervalRef.current = setInterval(captureAndSendFrame, 30000); // Every 30 seconds for better performance 
         
         return () => {
           clearTimeout(initialCaptureTimeout);
@@ -1942,8 +1940,8 @@ const Chat = () => {
       const context = canvas.getContext('2d');
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // INCREASED QUALITY for screen share frames - now 90% quality
-      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9); 
+      // OPTIMIZED QUALITY: Reduced to 70% for faster processing and smaller payloads
+      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.70); 
 
       if (imageDataUrl && imageDataUrl.length > 'data:image/jpeg;base64,'.length) {
         console.log("Captured screen frame successfully, size:", imageDataUrl.length, "bytes. Sending to backend...");
@@ -2000,8 +1998,9 @@ const Chat = () => {
             captureAndSendScreenFrame();
         }, 1000); 
 
-        // Reduced frequency - capture screen frames every 4 seconds
-        screenCaptureIntervalRef.current = setInterval(captureAndSendScreenFrame, 4000);
+        // PERFORMANCE OPTIMIZATION: Reduced frequency and quality for faster processing
+        // Set up interval to capture frames every 30 seconds (reduced from 4s)
+        screenCaptureIntervalRef.current = setInterval(captureAndSendScreenFrame, 30000);
 
         stream.getVideoTracks()[0].onended = () => {
           console.log("Screen sharing ended by user or browser.");
@@ -2115,49 +2114,32 @@ const Chat = () => {
       
       // If music is playing, increase the frequency of dance messages
       if (isMusicPlayingRef.current) {
-        // MODIFIED: Increased number of dancers from 1-3 to 3-6 for more spam
-        const dancerCount = Math.floor(Math.random() * 4) + 3; // 3-6 agents
+        // PERFORMANCE OPTIMIZATION: Reduced concurrent requests to prevent backend overload
+        const dancerCount = Math.floor(Math.random() * 2) + 2; // 2-3 agents
         const shuffledAgents = [...aiAgents].sort(() => 0.5 - Math.random());
         
-        for (let i = 0; i < dancerCount && i < shuffledAgents.length; i++) {
-          const randomAgent = shuffledAgents[i];
-          const danceMessage = generateDanceMessage();
-          
-          addMessageToChat(randomAgent.name, danceMessage, randomAgent.color, randomAgent.badges || []);
-        }
+        shuffledAgents.slice(0, dancerCount).forEach((agent, index) => {
+          const randomDelay = index * 400 + Math.floor(Math.random() * 400); // Increased stagger for less backend load
+          setTimeout(() => {
+            const danceMessage = generateDanceMessage();
+            if (danceMessage && danceMessage.trim() !== '') {
+              addMessageToChat(agent.name, danceMessage, agent.color, agent.badges || []);
+            }
+          }, randomDelay);
+        });
         
-        // MODIFIED: Much more frequent dance messages - every 400-800ms (was 800-2000ms)
-        const nextDanceDelay = Math.random() * 400 + 400;
-        visualCommentTimeoutIdRef.current = setTimeout(visualCommentLoop, nextDanceDelay);
+        // Slightly slower during dance mode to reduce backend load
+        visualCommentTimeoutIdRef.current = setTimeout(visualCommentLoop, 3000); // Every 3 seconds during dance
         return;
       }
       
-      // MODIFIED: Regular visual comment flow is now much faster and involves more agents
-      const hasRecentContext = visualContextMemory.lastUpdateTime && 
-                              (Date.now() - visualContextMemory.lastUpdateTime < 15000); // Within last 15 seconds
+      // Regular visual comments - reduced concurrent requests
+      const agentsToComment = Math.floor(Math.random() * 2) + 1; // 1-2 agents (reduced from 1-3)
+      const shuffledAgents = [...aiAgents].sort(() => 0.5 - Math.random());
       
-      if (!hasRecentContext) {
-        console.log("Skipping visual comment - no recent visual context available");
-        const nextDelay = Math.random() * 2000 + 3000; // Check again in 3-5s
-        visualCommentTimeoutIdRef.current = setTimeout(visualCommentLoop, nextDelay);
-        return;
-      }
-
-      // Have 2-4 agents comment on visuals at once
-      const commenterCount = Math.floor(Math.random() * 3) + 2; // 2-4 agents
-      const availableAgents = aiAgents.filter(a => !recentVisualCommentersRef.current.agents.includes(a.name));
-      const agentPool = availableAgents.length > 0 ? availableAgents : aiAgents;
-      const shuffledAgents = [...agentPool].sort(() => 0.5 - Math.random());
-      const commentingAgents = shuffledAgents.slice(0, commenterCount);
-
-      const newRecentCommenters = [...commentingAgents.map(a => a.name), ...recentVisualCommentersRef.current.agents];
-      recentVisualCommentersRef.current.agents = [...new Set(newRecentCommenters)].slice(0, 10);
-      
-      commentingAgents.forEach((agent, index) => {
-        // Stagger the visual comments slightly to make them feel more natural
-        const randomDelay = index * (Math.random() * 200 + 100); 
+      shuffledAgents.slice(0, agentsToComment).forEach((agent, index) => {
+        const randomDelay = index * 800 + Math.floor(Math.random() * 800); // Increased stagger to 800ms
         setTimeout(() => {
-          console.log(`Triggering periodic visual comment from ${agent.name}`);
           triggerVisualComment(agent).then(aiText => {
             if (aiText && aiText.trim() !== '') {
               addMessageToChat(agent.name, aiText, agent.color, agent.badges || []);
@@ -2168,8 +2150,8 @@ const Chat = () => {
         }, randomDelay);
       });
       
-      // MODIFIED: Fire next batch of visual comments much faster
-      const nextDelay = Math.random() * 2500 + 2500; // every 2.5 - 5 seconds
+      // Optimized timing: slightly slower to reduce backend pressure
+      const nextDelay = Math.random() * 3000 + 3000; // every 3-6 seconds (increased from 2.5-5s)
       visualCommentTimeoutIdRef.current = setTimeout(visualCommentLoop, nextDelay);
     };
 
@@ -2295,7 +2277,7 @@ const Chat = () => {
           <h1 className="text-xl font-bold tracking-tight">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-blue-500">SimulChat</span>
             <span className="ml-2 text-xs text-gray-400 font-normal">BETA</span>
-            <span className="ml-1 text-xs text-gray-500 font-mono">v1.1.0</span>
+            <span className="ml-1 text-xs text-gray-500 font-mono">v2.0.0</span>
           </h1>
           {cameraError && <span className="ml-4 text-xs text-red-400 bg-red-900/50 p-1 rounded">Camera: {cameraError}</span>}
           {screenShareError && <span className="ml-2 text-xs text-red-400 bg-red-900/50 p-1 rounded">Screen: {screenShareError}</span>}
